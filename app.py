@@ -1,7 +1,6 @@
 # app.py
 import os
 import json
-import textwrap
 import tempfile
 from pathlib import Path
 from typing import List
@@ -14,9 +13,11 @@ from keybert import KeyBERT
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from docx import Document
 import pdfplumber
+from sentence_transformers import SentenceTransformer
 
-# Initialize the keyword extractor
-kw_model = KeyBERT()
+# Initialize the keyword extractor with CPU-safe model
+custom_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+kw_model = KeyBERT(model=custom_model)
 
 # Prompt template used for individual content chunks
 CHUNK_PROMPT = (
@@ -28,7 +29,6 @@ CHUNK_PROMPT = (
 )
 
 # Function to extract readable text from a file
-
 def extract_text(uploaded_file) -> str:
     file_ext = Path(uploaded_file.name).suffix.lower()
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
@@ -147,4 +147,3 @@ if uploaded_file:
 
         except Exception as err:
             st.error(f"⚠️ Unable to process result: {err}")
-
