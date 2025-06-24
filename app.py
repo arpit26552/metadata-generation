@@ -112,8 +112,12 @@ if uploaded_file:
     import re
 import json
 
+import re
+
+response = query_mistral(final_instruction)
+
 try:
-    # Try to find the first valid JSON block in the response
+    # Extract first valid JSON object from the response string
     json_blocks = re.findall(r'\{.*?\}', response, re.DOTALL)
     for block in json_blocks:
         try:
@@ -124,38 +128,34 @@ try:
     else:
         raise ValueError("⚠️ No valid JSON detected.")
 
-        # Enhance keywords using KeyBERT
-        top_keywords = kw_model.extract_keywords(
-            cleaned_text,
-            keyphrase_ngram_range=(1, 2),
-            stop_words="english",
-            top_n=10,
-            use_maxsum=True,
-            nr_candidates=20
-        )
-        metadata["keywords"] = [kw for kw, _ in top_keywords]
+    # Run KeyBERT for better keywords
+    keyphrases = kw_model.extract_keywords(
+        cleaned,
+        keyphrase_ngram_range=(1, 2),
+        stop_words="english",
+        top_n=10,
+        use_maxsum=True,
+        nr_candidates=20
+    )
+    metadata["keywords"] = [kw for kw, _ in keyphrases]
 
-        # Display extracted metadata
-        st.markdown('<h3 style="color:#1f77b4;">📌 <b>Extracted Metadata</b></h3>', unsafe_allow_html=True)
-        st.json(metadata)
+    # Display in Streamlit
+    st.markdown('<h3 style="color:#1f77b4;">📌 <b>Extracted Metadata</b></h3>', unsafe_allow_html=True)
+    st.json(metadata)
 
-        # Show final summary nicely
-        st.markdown('<h3 style="color:#2ca02c;">📝 <b>Wrapped Summary</b></h3>', unsafe_allow_html=True)
-        st.markdown(
-            f"<div style='color:#333;font-size:16px;background:#f4f4f4;padding:15px;border-radius:8px'>{metadata['summary']}</div>",
-            unsafe_allow_html=True
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<h3 style="color:#2ca02c;">📝 <b>Wrapped Summary</b></h3>', unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='color:#333;font-size:16px;background:#f4f4f4;padding:15px;border-radius:8px'>{metadata['summary']}</div>",
+        unsafe_allow_html=True
+    )
+    st.download_button(
+        label="💾 Download Summary",
+        data=metadata["summary"],
+        file_name="summary.txt",
+        mime="text/plain"
+    )
 
-        # Download summary
-        st.download_button(
-            label="💾 Download Summary",
-            data=metadata["summary"],
-            file_name="summary.txt",
-            mime="text/plain"
-        )
+    st.markdown("<hr><div style='text-align:center;color:#888'>Built by Arpit · Powered by Mistral AI</div>", unsafe_allow_html=True)
 
-        st.markdown("<hr><div style='text-align:center;color:#888'>Built by Arpit · Powered by Mistral AI</div>", unsafe_allow_html=True)
-
-    except Exception as e:
-        st.error(f"⚠️ Unable to process result: {e}")
+except Exception as e:
+    st.error(f"⚠️ Unable to process result: {e}")
