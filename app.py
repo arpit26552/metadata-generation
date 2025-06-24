@@ -17,7 +17,8 @@ from docx import Document
 import pdfplumber
 
 # Initialize the keyword extractor
-kw_model = KeyBERT()
+from sentence_transformers import SentenceTransformer
+kw_model = KeyBERT(SentenceTransformer("all-MiniLM-L6-v2", device="cpu"))
 
 # Prompt template used for individual content chunks
 CHUNK_PROMPT = (
