@@ -1,8 +1,9 @@
 # app.py
 import os
 import json
-import re
+import textwrap
 import tempfile
+import re
 from pathlib import Path
 from typing import List
 
@@ -15,10 +16,10 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from docx import Document
 import pdfplumber
 
-# Initialize KeyBERT model
+# Initialize the keyword extractor
 kw_model = KeyBERT()
 
-# Prompt template for chunk-level summarization
+# Prompt template used for individual content chunks
 CHUNK_PROMPT = (
     "You are a smart assistant. Analyze the following content snippet and provide:\n"
     "- A short summary (1-2 lines)\n"
@@ -27,58 +28,62 @@ CHUNK_PROMPT = (
     "{chunk}"
 )
 
-# Extract text (with OCR fallback for PDFs)
+# Function to extract readable text from a file
 def extract_text(uploaded_file) -> str:
-    ext = Path(uploaded_file.name).suffix.lower()
-    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+    file_ext = Path(uploaded_file.name).suffix.lower()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
         tmp.write(uploaded_file.read())
         tmp_path = Path(tmp.name)
 
-    if ext == ".txt":
+    if file_ext == ".txt":
         return tmp_path.read_text(encoding="utf-8", errors="ignore")
-    elif ext == ".docx":
+    elif file_ext == ".docx":
         return "\n".join(p.text for p in Document(tmp_path).paragraphs)
-    elif ext == ".pdf":
+    elif file_ext == ".pdf":
         text = ""
         with pdfplumber.open(tmp_path) as pdf:
             for page in pdf.pages:
-                t = page.extract_text()
-                if t:
-                    text += t
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted
                 else:
                     img = page.to_image(resolution=300).original
                     text += pytesseract.image_to_string(img)
         return text
-    raise ValueError("Unsupported file type")
+    raise ValueError(f"Unsupported file extension: {file_ext}")
 
-# Clean up raw text
+# Normalize text spacing and line breaks
 def clean_text(text: str) -> str:
     return " ".join(text.split())
 
-# Split into chunks for summarization
-def split_into_chunks(text: str, size=1700, overlap=50) -> List[str]:
-    splitter = RecursiveCharacterTextSplitter(chunk_size=size, chunk_overlap=overlap)
-    return splitter.split_text(text)
+# Break down text into manageable segments for LLM processing
+def segment_text(text: str, size=1700, overlap=50) -> List[str]:
+    return RecursiveCharacterTextSplitter(chunk_size=size, chunk_overlap=overlap).split_text(text)
 
-# Call Mistral API for summarization
-def call_mistral(prompt: str, temperature=0.3) -> str:
+# Communicate with the Mistral API to get summarization output
+def query_mistral(prompt: str, temperature=0.3) -> str:
     api_url = os.getenv("MISTRAL_API_URL")
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_url or not api_key:
-        raise ValueError("MISTRAL_API_URL and MISTRAL_API_KEY must be set as env vars")
+        raise ValueError("Environment variables for API not set")
 
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     payload = {
         "model": "open-mistral-7b",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": temperature
     }
-
     response = requests.post(api_url, headers=headers, json=payload, timeout=60)
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"].strip()
 
-# Streamlit UI
+# ───────────────────────────────
+# Streamlit App Interface
+# ───────────────────────────────
+
 st.set_page_config(page_title="Metadata & Summary Generator", layout="centered")
 
 st.markdown('<h1 style="color:#4A90E2;text-align:center;">📄 Auto Metadata & Summary Generator</h1>', unsafe_allow_html=True)
@@ -86,16 +91,15 @@ st.markdown('<h1 style="color:#4A90E2;text-align:center;">📄 Auto Metadata & S
 uploaded_file = st.file_uploader("📂 Upload a document (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"])
 
 if uploaded_file:
-    with st.spinner("🔍 Processing your document..."):
-        raw_text = extract_text(uploaded_file)
-        cleaned_text = clean_text(raw_text)
-        chunks = split_into_chunks(cleaned_text)
+    with st.spinner("🔍 Analyzing your document..."):
+        raw = extract_text(uploaded_file)
+        cleaned = clean_text(raw)
+        segments = segment_text(cleaned)
 
-        partial_summaries = [call_mistral(CHUNK_PROMPT.format(chunk=c)) for c in chunks]
-        combined = "\n\n".join(partial_summaries)
+        summaries = [query_mistral(CHUNK_PROMPT.format(chunk=part)) for part in segments]
+        combined_summary = "\n\n".join(summaries)
 
-        # Final summarization and metadata prompt
-        final_prompt = (
+        final_instruction = (
             "You are a document metadata expert. Use the provided chunk summaries to assemble structured information.\n\n"
             "Provide a result in JSON with the following keys:\n"
             "- title\n"
@@ -104,58 +108,43 @@ if uploaded_file:
             "- keywords (list)\n"
             "- document_type (default to 'Article')\n"
             "- summary\n\n"
-            f"Summaries:\n{combined}"
+            f"Summaries:\n{combined_summary}"
         )
 
-        final_output = call_mistral(final_prompt)
+        response = query_mistral(final_instruction)
 
-    import re
-import json
-
-import re
-
-response = query_mistral(final_instruction)
-
-try:
-    # Extract first valid JSON object from the response string
-    json_blocks = re.findall(r'\{.*?\}', response, re.DOTALL)
-    for block in json_blocks:
         try:
-            metadata = json.loads(block)
-            break
-        except json.JSONDecodeError:
-            continue
-    else:
-        raise ValueError("⚠️ No valid JSON detected.")
+            json_blocks = re.findall(r'\{.*?\}', response, re.DOTALL)
+            metadata = json.loads(json_blocks[0]) if json_blocks else json.loads(response)
 
-    # Run KeyBERT for better keywords
-    keyphrases = kw_model.extract_keywords(
-        cleaned,
-        keyphrase_ngram_range=(1, 2),
-        stop_words="english",
-        top_n=10,
-        use_maxsum=True,
-        nr_candidates=20
-    )
-    metadata["keywords"] = [kw for kw, _ in keyphrases]
+            keyphrases = kw_model.extract_keywords(
+                cleaned,
+                keyphrase_ngram_range=(1, 2),
+                stop_words="english",
+                top_n=10,
+                use_maxsum=True,
+                nr_candidates=20
+            )
+            metadata["keywords"] = [kw for kw, _ in keyphrases]
 
-    # Display in Streamlit
-    st.markdown('<h3 style="color:#1f77b4;">📌 <b>Extracted Metadata</b></h3>', unsafe_allow_html=True)
-    st.json(metadata)
+            st.markdown('<h3 style="color:#1f77b4;">📌 <b>Extracted Metadata</b></h3>', unsafe_allow_html=True)
+            st.json(metadata)
 
-    st.markdown('<h3 style="color:#2ca02c;">📝 <b>Wrapped Summary</b></h3>', unsafe_allow_html=True)
-    st.markdown(
-        f"<div style='color:#333;font-size:16px;background:#f4f4f4;padding:15px;border-radius:8px'>{metadata['summary']}</div>",
-        unsafe_allow_html=True
-    )
-    st.download_button(
-        label="💾 Download Summary",
-        data=metadata["summary"],
-        file_name="summary.txt",
-        mime="text/plain"
-    )
+            st.markdown('<h3 style="color:#2ca02c;">📝 <b>Wrapped Summary</b></h3>', unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='color:#333;font-size:16px;background:#f4f4f4;padding:15px;border-radius:8px'>{metadata['summary']}</div>",
+                unsafe_allow_html=True
+            )
+            st.markdown("<br>", unsafe_allow_html=True)
 
-    st.markdown("<hr><div style='text-align:center;color:#888'>Built by Arpit · Powered by Mistral AI</div>", unsafe_allow_html=True)
+            st.download_button(
+                label="💾 Download Summary",
+                data=metadata["summary"],
+                file_name="summary.txt",
+                mime="text/plain"
+            )
 
-except Exception as e:
-    st.error(f"⚠️ Unable to process result: {e}")
+            st.markdown("<hr><div style='text-align:center;color:#888'>Built by Arpit · Powered by Mistral AI</div>", unsafe_allow_html=True)
+
+        except Exception as err:
+            st.error(f"⚠️ Unable to process result: {err}")
