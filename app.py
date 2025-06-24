@@ -110,11 +110,16 @@ if uploaded_file:
         final_output = call_mistral(final_prompt)
 
     try:
-        # Extract valid JSON from LLM response
-        json_match = re.search(r'{[\s\S]+}', final_output)
-        if not json_match:
-            raise ValueError("⚠️ No valid JSON detected.")
-        metadata = json.loads(json_match.group())
+    # Try to find the first valid JSON block
+    json_blocks = re.findall(r'\{.*?\}', final_output, re.DOTALL)
+    for block in json_blocks:
+        try:
+            metadata = json.loads(block)
+            break
+        except json.JSONDecodeError:
+            continue
+    else:
+        raise ValueError("⚠️ No valid JSON detected.")
 
         # Enhance keywords using KeyBERT
         top_keywords = kw_model.extract_keywords(
