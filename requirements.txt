@@ -7,4 +7,4 @@ langchain
 scikit-learn
 sentence-transformers
 pytesseract
-pillow
+Pillow
