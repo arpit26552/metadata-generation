@@ -1,8 +1,0 @@
-streamlit
-keybert
-pdfplumber
-python-docx
-requests
-langchain
-scikit-learn
-sentence-transformers
