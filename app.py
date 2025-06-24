@@ -109,9 +109,12 @@ if uploaded_file:
 
         final_output = call_mistral(final_prompt)
 
-    try:
-    # Try to find the first valid JSON block
-    json_blocks = re.findall(r'\{.*?\}', final_output, re.DOTALL)
+    import re
+import json
+
+try:
+    # Try to find the first valid JSON block in the response
+    json_blocks = re.findall(r'\{.*?\}', response, re.DOTALL)
     for block in json_blocks:
         try:
             metadata = json.loads(block)
