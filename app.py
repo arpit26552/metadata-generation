@@ -1,6 +1,7 @@
 # app.py
 import os
 import json
+import re
 import tempfile
 from pathlib import Path
 from typing import List
@@ -13,13 +14,11 @@ from keybert import KeyBERT
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from docx import Document
 import pdfplumber
-from sentence_transformers import SentenceTransformer
 
-# Initialize the keyword extractor with CPU-safe model
-custom_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-kw_model = KeyBERT(model=custom_model)
+# Initialize KeyBERT
+kw_model = KeyBERT()
 
-# Prompt template used for individual content chunks
+# Prompt for each content chunk
 CHUNK_PROMPT = (
     "You are a smart assistant. Analyze the following content snippet and provide:\n"
     "- A short summary (1-2 lines)\n"
@@ -28,7 +27,7 @@ CHUNK_PROMPT = (
     "{chunk}"
 )
 
-# Function to extract readable text from a file
+# Extract text from uploaded file
 def extract_text(uploaded_file) -> str:
     file_ext = Path(uploaded_file.name).suffix.lower()
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
@@ -52,20 +51,20 @@ def extract_text(uploaded_file) -> str:
         return text
     raise ValueError(f"Unsupported file extension: {file_ext}")
 
-# Normalize text spacing and line breaks
+# Clean and normalize the text
 def clean_text(text: str) -> str:
     return " ".join(text.split())
 
-# Break down text into manageable segments for LLM processing
+# Break text into chunks for LLM
 def segment_text(text: str, size=1700, overlap=50) -> List[str]:
     return RecursiveCharacterTextSplitter(chunk_size=size, chunk_overlap=overlap).split_text(text)
 
-# Communicate with the Mistral API to get summarization output
+# Call Mistral API
 def query_mistral(prompt: str, temperature=0.3) -> str:
     api_url = os.getenv("MISTRAL_API_URL")
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_url or not api_key:
-        raise ValueError("Environment variables for API not set")
+        raise ValueError("MISTRAL_API_URL and MISTRAL_API_KEY must be set.")
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -81,7 +80,7 @@ def query_mistral(prompt: str, temperature=0.3) -> str:
     return response.json()["choices"][0]["message"]["content"].strip()
 
 # ───────────────────────────────
-# Streamlit App Interface
+# Streamlit App
 # ───────────────────────────────
 
 st.set_page_config(page_title="Metadata & Summary Generator", layout="centered")
@@ -114,8 +113,13 @@ if uploaded_file:
         response = query_mistral(final_instruction)
 
         try:
-            metadata = json.loads(response)
+            # Extract valid JSON using regex
+            json_match = re.search(r'{[\s\S]+}', response)
+            if not json_match:
+                raise ValueError("No JSON object found in response.")
+            metadata = json.loads(json_match.group())
 
+            # Update keywords using KeyBERT
             keyphrases = kw_model.extract_keywords(
                 cleaned,
                 keyphrase_ngram_range=(1, 2),
@@ -126,6 +130,7 @@ if uploaded_file:
             )
             metadata["keywords"] = [kw for kw, _ in keyphrases]
 
+            # Display output
             st.markdown('<h3 style="color:#1f77b4;">📌 <b>Extracted Metadata</b></h3>', unsafe_allow_html=True)
             st.json(metadata)
 
