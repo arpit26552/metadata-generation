@@ -2,7 +2,7 @@
 
 An intelligent Streamlit-based app that extracts structured **metadata** and a **concise summary** from uploaded documents (PDF, DOCX, or TXT). Powered by Mistral AI and enhanced with KeyBERT for high-quality keyword extraction.
 
-🔗 **Live App**: [Try it here](https://metadata-generationgit-moavxnj5jsacuyrysdngjj.streamlit.app/)
+🔗 **Live App**: [Try it here]([https://metadata-generationgit-moavxnj5jsacuyrysdngjj.streamlit.app/](https://metadata-generation-ebtysf3m28gnrrusfqvwak.streamlit.app/))
 
 ---
 
