@@ -49,8 +49,9 @@ Install dependencies: pip install -r requirements.txt
   - [python-docx](https://github.com/python-openxml/python-docx) – DOCX parsing
   - [LangChain](https://www.langchain.com/) – Chunk splitter
 
-# 4. Run the Streamlit app
+ 4. Run the Streamlit app
   - streamlit run app.py
+
 
 ✍️ Author
 Made with ❤️ by Arpit Kumar
