@@ -96,30 +96,37 @@ if file:
 
         summaries = [call_mistral(PROMPT_TEMPLATE.format(content_chunk=chunk)) for chunk in chunks]
         combined = "\n\n".join(summaries)
-
+        # Capture first 5 lines to extract potential metadata
+        header_block = "\n".join(clean_text.splitlines()[:5])
+        combined_with_header = header_block + "\n\n" + combined
         # Final summarization prompt
         final_prompt = f"""
 You are a smart metadata assistant. Below are partial summaries of a document generated from different chunks.
 
-Your task is to first read the chunks carefully to combine them into a **single, coherent metadata JSON object** with meaningful values.
+Your task is to carefully read the partial summaries and synthesize them into a **single, coherent metadata JSON object** with meaningful, deduplicated values.
 
-Infer the **title** and **author** based on the document as a whole, even if not explicitly mentioned.
-Generate a meaningful, concise **summary** for the full document.
-Merge and deduplicate the keywords intelligently.
-Assume the document type is "Article" unless there's a clear reason to choose otherwise.
+Follow these rules:
 
-Return the result in this JSON format:
+1. **title**: Infer a clear, meaningful title based on the content. If no strong title is evident, generate a short descriptive one.
+2. **author**: If a name is mentioned, use it. Otherwise, return "Not specified".
+3. **date**: Look for any date patterns in the summaries (e.g., '2024-11-10', 'Nov 10, 2024'). If not found, return "Not specified".
+4. **keywords**: Merge, deduplicate, and refine keywords from all chunks. Return 4–7 concise keywords.
+5. **document_type**: Use "Article" unless there's a clear reason to choose another from: ["research paper", "legal notice", "resume", "report", "book chapter", "article", "business proposal", "letter", "others"].
+6. **summary**: Write a clean, neutral, 3–5 sentence summary that captures the overall meaning of the full document.
+
+Return the result in this strict JSON format (no markdown, no commentary):
+
 {{
   "title": "Meaningful title of the whole document",
-  "author": "Author name (or 'Not specified' if not found)",
-  "date": "Not specified",
+  "author": "Author name (or 'Not specified')",
+  "date": "Extracted date if available, otherwise 'Not specified'",
   "keywords": ["keyword1", "keyword2", "..."],
   "document_type": "Article",
   "summary": "Clean, concise summary of the full document."
 }}
 
 Here are the partial summaries:
-\"\"\"{combined}\"\"\"
+\"\"\"{combined_with_header}\"\"\"
 """
         final_output = call_mistral(final_prompt)
 
