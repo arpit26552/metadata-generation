@@ -42,16 +42,17 @@ cd metadata-generation
 Install dependencies: pip install -r requirements.txt
 
 3. Setup API Keys
-  - [Streamlit](https://streamlit.io) – UI framework
-  - [Mistral API](https://mistral.ai) – LLM-powered chunk summarization
-  - [KeyBERT](https://github.com/MaartenGr/KeyBERT) – Keyword extraction
-  - [pdfplumber](https://github.com/jsvine/pdfplumber) – PDF parsing
-  - [python-docx](https://github.com/python-openxml/python-docx) – DOCX parsing
-  - [LangChain](https://www.langchain.com/) – Chunk splitter
+   - [Streamlit](https://streamlit.io) – UI framework
+   - [Mistral API](https://mistral.ai) – LLM-powered chunk summarization
+   - [KeyBERT](https://github.com/MaartenGr/KeyBERT) – Keyword extraction
+   - [pdfplumber](https://github.com/jsvine/pdfplumber) – PDF parsing
+   - [python-docx](https://github.com/python-openxml/python-docx) – DOCX parsing
+   - [LangChain](https://www.langchain.com/) – Chunk splitter
 
  4. Run the Streamlit app
-  - streamlit run app.py
-
+   - streamlit run app.py
+  - 
+---
 
 ✍️ Author
 Made with ❤️ by Arpit Kumar
