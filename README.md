@@ -34,9 +34,8 @@ An intelligent Streamlit-based app that extracts structured **metadata** and a *
 
 ## 🛠️ How to Run Locally
 
-```bash
 1. Clone this repo:
-git clone https://github.com/your-username/metadata-generation.git
+git clone [clone](https://github.com/arpit26552/metadata-generation.git)
 cd metadata-generation
 
 2. Install requirements
