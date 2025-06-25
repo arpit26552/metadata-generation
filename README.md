@@ -55,4 +55,4 @@ Install dependencies: pip install -r requirements.txt
 ---
 
   ✍️ Author 
-  Made with ❤️ by Arpit Kumar
+     Made with ❤️ by Arpit Kumar
