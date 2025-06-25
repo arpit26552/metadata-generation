@@ -51,8 +51,8 @@ Install dependencies: pip install -r requirements.txt
 
  4. Run the Streamlit app
    - streamlit run app.py
-  - 
+
 ---
 
-✍️ Author
-Made with ❤️ by Arpit Kumar
+                            ✍️ Author 
+                     Made with ❤️ by Arpit Kumar
